@@ -22,6 +22,9 @@ export type HandState = {
   currentPlayerIndex: number;
   playerOrder: string[];
   players: Record<string, IndianPokerPlayer>;
+  lastRaiseSize: number;
+  isOver: boolean;
+  winnerId: string | null;
 };
 
 export type RoundState = {
@@ -29,6 +32,9 @@ export type RoundState = {
   currentHand: HandState | null;
   handHistory: HandResult[];
   cardsRemaining: number;
+  smallBlind: number;
+  bigBlind: number;
+  stake: number;
 };
 
 export type HandResult = {
@@ -43,12 +49,18 @@ export type IndianPokerAction =
   | { type: "call" }
   | { type: "raise"; amount: number };
 
+export type OtherPlayerView = Omit<IndianPokerPlayer, "card"> & {
+  card: Card;
+};
+
+export type SelfPlayerView = Omit<IndianPokerPlayer, "card"> & {
+  card: null;
+};
+
 export type IndianPokerPlayerView = {
-  hand: HandState & {
-    players: Record<
-      string,
-      Omit<IndianPokerPlayer, "card"> & { card: Card | null }
-    >;
+  hand: Omit<HandState, "players"> & {
+    players: Record<string, OtherPlayerView | SelfPlayerView>;
   };
+  myId: string;
   myStack: number;
 };
