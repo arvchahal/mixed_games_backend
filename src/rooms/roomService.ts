@@ -1,11 +1,9 @@
 import { getRoom } from "./roomManager";
-import { getEngine, AnyEngine } from "../games/core/registry";
+import { getEngine } from "../games/core/registry";
 import { Room, RoomPlayer } from "./roomTypes";
 import { PlayerSeed, PlayerSummary } from "../games/core/engine";
 
-type ServiceResult = { error?: string };
-
-// ─── Player lifecycle ────────────────────────────────────────────────────────
+export type ServiceResult = { error?: string };
 
 export function joinRoom(
     roomId: string,
@@ -20,7 +18,11 @@ export function joinRoom(
     );
     if (alreadyIn) return {}; // reconnect — no-op
 
-    const player: RoomPlayer = { id: playerId, displayName, joinedAt: Date.now() };
+    const player: RoomPlayer = {
+        id: playerId,
+        displayName,
+        joinedAt: Date.now(),
+    };
 
     if (room.status === "lobby") {
         room.players.push(player);
@@ -42,20 +44,22 @@ export function leaveRoom(roomId: string, playerId: string): ServiceResult {
 
     // Transfer ownership to the earliest joiner if owner left
     if (room.ownerId === playerId) {
-        const next = [...room.players].sort((a, b) => a.joinedAt - b.joinedAt)[0];
+        const next = [...room.players].sort(
+            (a, b) => a.joinedAt - b.joinedAt,
+        )[0];
         room.ownerId = next.id;
     }
 
     return {};
 }
 
-// ─── Round lifecycle ─────────────────────────────────────────────────────────
-
 export function startRound(roomId: string, requesterId: string): ServiceResult {
     const room = getRoom(roomId);
     if (!room) return { error: "room not found" };
-    if (room.ownerId !== requesterId) return { error: "only the owner can start a round" };
-    if (room.status === "in_round") return { error: "round already in progress" };
+    if (room.ownerId !== requesterId)
+        return { error: "only the owner can start a round" };
+    if (room.status === "in_round")
+        return { error: "round already in progress" };
     if (room.players.length < 2) return { error: "need at least 2 players" };
 
     // Seat pending players
@@ -78,8 +82,6 @@ export function startRound(roomId: string, requesterId: string): ServiceResult {
 
     return {};
 }
-
-// ─── Hand lifecycle ──────────────────────────────────────────────────────────
 
 export function handlePlayerAction(
     roomId: string,
@@ -110,14 +112,10 @@ export function handlePlayerAction(
     return {};
 }
 
-// ─── Internal ────────────────────────────────────────────────────────────────
-
 function endRound(room: Room): void {
     room.status = "lobby";
     // Pending players will be seated on the next startRound call
 }
-
-// ─── View helpers (called by socket handlers after every state change) ────────
 
 export function getViews(room: Room): Record<string, unknown> {
     if (!room.round) return {};
