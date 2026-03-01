@@ -31,6 +31,7 @@ export type RoundState = {
   players: Record<string, IndianPokerPlayer>;
   currentHand: HandState | null;
   handHistory: HandResult[];
+  deck: Card[];
   cardsRemaining: number;
   smallBlind: number;
   bigBlind: number;
@@ -40,6 +41,13 @@ export type RoundState = {
 export type HandResult = {
   winnerId: string;
   pot: number;
+};
+
+export type IndianPokerRoundConfig = {
+  players: IndianPokerPlayer[];
+  stake: number;
+  smallBlind: number;
+  bigBlind: number;
 };
 
 export type IndianPokerAction =

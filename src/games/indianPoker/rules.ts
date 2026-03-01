@@ -2,7 +2,7 @@
 import { cardValue } from "../core/helpers";
 import { IndianPokerPlayer, HandState } from "./types";
 import { getCurrentPlayer } from "./helpers";
-class IndianPokerRules {
+export class IndianPokerRules {
     determine_winner(
         players: Array<IndianPokerPlayer>,
     ): IndianPokerPlayer | undefined {
