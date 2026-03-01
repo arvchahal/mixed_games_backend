@@ -1,4 +1,4 @@
-import { GameEngine } from "../core/engine";
+import { GameEngine, PlayerSeed, PlayerSummary } from "../core/engine";
 import {
     RoundState,
     IndianPokerAction,
@@ -208,6 +208,69 @@ export class IndianPokerEngine
             case "raise":  return !rules.can_raise(player, hand) ? "cannot raise" :
                                   !rules.isValidRaiseAmount(player, hand, action.amount) ? "invalid raise amount" : null;
         }
+    }
+
+    buildRoundConfig(players: PlayerSeed[], settings: Record<string, unknown>): IndianPokerRoundConfig {
+        const stake = settings.stake as number;
+        const smallBlind = settings.smallBlind as number;
+        const bigBlind = settings.bigBlind as number;
+
+        const builtPlayers: IndianPokerPlayer[] = players.map((p) => ({
+            id: p.id,
+            displayName: p.displayName,
+            isOwner: p.isOwner,
+            stack: stake,
+            totalBuyIn: stake,
+            card: null,
+            handStatus: "active" as const,
+            sessionStatus: "seated" as const,
+        }));
+
+        return { players: builtPlayers, stake, smallBlind, bigBlind };
+    }
+
+    isHandOver(round: RoundState): boolean {
+        return round.currentHand?.isOver ?? false;
+    }
+
+    resolveHand(round: RoundState): RoundState {
+        const newRound = structuredClone(round);
+        const hand = newRound.currentHand!;
+
+        const winnerId = this.getHandWinner(newRound);
+        if (winnerId) {
+            hand.players[winnerId].stack += hand.pot;
+            hand.winnerId = winnerId;
+        }
+
+        // Sync hand stacks back to round players
+        for (const [id, handPlayer] of Object.entries(hand.players)) {
+            newRound.players[id].stack = handPlayer.stack;
+        }
+
+        // Record hand result
+        if (winnerId) {
+            newRound.handHistory.push({ winnerId, pot: hand.pot });
+        }
+
+        // Eliminate busted players
+        for (const player of Object.values(newRound.players)) {
+            if (player.stack === 0) {
+                player.sessionStatus = "eliminated";
+            }
+        }
+
+        return newRound;
+    }
+
+    getRoundSummary(round: RoundState): PlayerSummary[] {
+        return Object.values(round.players).map((p) => ({
+            id: p.id,
+            displayName: p.displayName,
+            totalBuyIn: p.totalBuyIn,
+            finalStack: p.stack,
+            delta: p.stack - p.totalBuyIn,
+        }));
     }
 
     getPlayerView(round: RoundState, playerId: string): IndianPokerPlayerView {
