@@ -2,6 +2,7 @@ export type PlayerSeed = {
     id: string;
     displayName: string;
     isOwner: boolean;
+    stack: number;
 };
 
 export type PlayerSummary = {

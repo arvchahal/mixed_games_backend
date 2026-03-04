@@ -9,19 +9,24 @@ export function joinRoom(
     roomId: string,
     playerId: string,
     displayName: string,
+    stack: number,
 ): ServiceResult {
     const room = getRoom(roomId);
     if (!room) return { error: "room not found" };
 
-    const alreadyIn = [...room.players, ...room.pendingPlayers].some(
+    const existing = [...room.players, ...room.pendingPlayers].find(
         (p) => p.id === playerId,
     );
-    if (alreadyIn) return {}; // reconnect — no-op
+    if (existing) {
+        existing.stack = stack;
+        return {};
+    }
 
     const player: RoomPlayer = {
         id: playerId,
         displayName,
         joinedAt: Date.now(),
+        stack,
     };
 
     if (room.status === "lobby") {
@@ -71,6 +76,7 @@ export function startRound(roomId: string, requesterId: string): ServiceResult {
         id: p.id,
         displayName: p.displayName,
         isOwner: p.id === room.ownerId,
+        stack: p.stack,
     }));
 
     const config = engine.buildRoundConfig(seeds, room.settings);

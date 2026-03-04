@@ -9,6 +9,7 @@ export function createRoom(
     displayName: string,
     gameType: GameType,
     settings: Record<string, unknown>,
+    stack: number,
 ): Room {
     let id = generateRoomURL();
     while (rooms.has(id)) {
@@ -19,6 +20,7 @@ export function createRoom(
         id: ownerId,
         displayName,
         joinedAt: Date.now(),
+        stack,
     };
 
     const room: Room = {

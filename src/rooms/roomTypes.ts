@@ -6,6 +6,7 @@ export type RoomPlayer = {
     id: string;
     displayName: string;
     joinedAt: number; // Date.now() — used for ownership transfer order
+    stack: number;
 };
 
 export type Room = {

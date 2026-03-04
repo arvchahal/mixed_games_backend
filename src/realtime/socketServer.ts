@@ -6,7 +6,7 @@ import { getRoom } from "../rooms/roomManager";
 import { generatePlayerId } from "../utils/ids";
 import { GameType } from "../games/core/registry";
 
-const httpServer = createServer();
+export const httpServer = createServer();
 
 export const io = new Server(httpServer, {
     cors: {
@@ -16,6 +16,18 @@ export const io = new Server(httpServer, {
 
 // playerId → socketId so we can send each player their own view (hidden info)
 const playerSockets = new Map<string, string>();
+
+function broadcastLobby(roomId: string) {
+    const room = getRoom(roomId);
+    if (!room) return;
+    io.to(roomId).emit("lobby_update", {
+        roomId: room.id,
+        ownerId: room.ownerId,
+        status: room.status,
+        players: room.players,
+        pendingPlayers: room.pendingPlayers,
+    });
+}
 
 function broadcastViews(roomId: string) {
     const room = getRoom(roomId);
@@ -34,21 +46,24 @@ io.on("connection", (socket) => {
         const displayName: string = data.display_name;
         const gameType: GameType = data.game_type;
         const settings: Record<string, unknown> = data.settings;
+        const stack: number = data.stack ?? (settings.bigBlind as number) ?? 1;
 
         const playerId = generatePlayerId();
-        const room = createRoom(playerId, displayName, gameType, settings);
+        const room = createRoom(playerId, displayName, gameType, settings, stack);
 
         playerSockets.set(playerId, socket.id);
         socket.join(room.id);
         socket.emit("room_created", { roomId: room.id, playerId });
+        broadcastLobby(room.id);
     });
 
     socket.on("join_room", (data) => {
         const roomId: string = data.room_id;
         const displayName: string = data.display_name;
         const playerId: string = data.player_id ?? generatePlayerId();
+        const stack: number = data.stack ?? 1;
 
-        const result = joinRoom(roomId, playerId, displayName);
+        const result = joinRoom(roomId, playerId, displayName, stack);
         if (result.error) {
             socket.emit("error", { message: result.error });
             return;
@@ -57,6 +72,7 @@ io.on("connection", (socket) => {
         playerSockets.set(playerId, socket.id);
         socket.join(roomId);
         socket.emit("room_joined", { roomId, playerId });
+        broadcastLobby(roomId);
     });
 
     socket.on("start_round", (data) => {
