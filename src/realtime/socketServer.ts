@@ -1,6 +1,6 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { createRoom } from "../rooms/roomManager";
+import { createRoom, updateRoomSettings } from "../rooms/roomManager";
 import { joinRoom, handlePlayerAction, startRound, startNextHand, getRoomLedger, getViews } from "../rooms/roomService";
 import { getRoom } from "../rooms/roomManager";
 import { getEngine } from "../games/core/registry";
@@ -103,6 +103,7 @@ function broadcastLobby(roomId: string) {
         roomId: room.id,
         ownerId: room.ownerId,
         status: room.status,
+        settings: room.settings,
         players: room.players,
         pendingPlayers: room.pendingPlayers,
         ledger: getRoomLedger(room),
@@ -210,6 +211,20 @@ io.on("connection", (socket) => {
         }
 
         publishRoomState(roomId);
+    });
+
+    socket.on("update_settings", (data) => {
+        const roomId: string = data.room_id;
+        const playerId: string = data.player_id;
+        const settings: Record<string, unknown> = data.settings;
+
+        const result = updateRoomSettings(roomId, playerId, settings);
+        if (result.error) {
+            socket.emit("error", { message: result.error });
+            return;
+        }
+
+        broadcastLobby(roomId);
     });
 
     socket.on("disconnect", () => {
