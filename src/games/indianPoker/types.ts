@@ -83,4 +83,9 @@ export type IndianPokerPlayerView = {
   myId: string;
   myStack: number;
   ledger: LedgerEntry[];
+  chatMessages: {
+    displayName: string;
+    text: string;
+    sentAt: number;
+  }[];
 };

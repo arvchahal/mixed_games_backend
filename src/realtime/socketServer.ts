@@ -126,6 +126,7 @@ function broadcastLobby(roomId: string) {
         players: room.players.map((p) => ({ ...p, connected: playerSockets.has(p.id) })),
         pendingPlayers: room.pendingPlayers,
         ledger: getRoomLedger(room),
+        chatMessages: room.chatMessages,
     });
 }
 
@@ -264,6 +265,21 @@ io.on("connection", (socket) => {
         broadcastLobby(roomId);
     });
 
+    socket.on("chat_message", (data) => {
+        const roomId: string = data.room_id;
+        const playerId: string = data.player_id;
+        const text: string = data.text;
+        if (!text?.trim()) return;
+        const room = getRoom(roomId);
+        if (!room) return;
+        const player = room.players.find((p) => p.id === playerId);
+        if (!player) return;
+        const message = { displayName: player.displayName, text: text.trim(), sentAt: Date.now() };
+        room.chatMessages.push(message);
+        room.chatMessages = room.chatMessages.slice(-100);
+        io.to(roomId).emit("chat_message", message);
+    });
+
     socket.on("transfer_ownership", (data) => {
         const roomId: string = data.room_id;
         const playerId: string = data.player_id;
@@ -291,7 +307,19 @@ io.on("connection", (socket) => {
             const roomId = playerRooms.get(disconnectedPlayerId);
             if (roomId) {
                 const room = getRoom(roomId);
-                if (room) broadcastLobby(roomId);
+                if (room) {
+                    // If in a round and no players remain connected, return to lobby
+                    if (room.status === "in_round") {
+                        const anyConnected = room.players.some((p) => playerSockets.has(p.id));
+                        if (!anyConnected) {
+                            clearTurnTimer(roomId);
+                            clearHandTransitionTimer(roomId);
+                            room.status = "lobby";
+                            room.round = null;
+                        }
+                    }
+                    broadcastLobby(roomId);
+                }
             }
         }
     });

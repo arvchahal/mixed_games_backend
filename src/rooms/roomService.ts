@@ -13,6 +13,7 @@ type LedgerEntry = {
 type PlayerViewPayload = {
     myStack?: number;
     ledger?: LedgerEntry[];
+    chatMessages?: Room["chatMessages"];
 };
 
 export function joinRoom(
@@ -181,6 +182,7 @@ export function getViews(room: Room): Record<string, unknown> {
                 ...view,
                 myStack: getDisplayedStack(room, player.id),
                 ledger: getRoomLedger(room),
+                chatMessages: room.chatMessages,
             };
         } catch {
             // player not in current hand (e.g. pending or eliminated)

@@ -47,5 +47,6 @@ export function getPlayerView(
         myId: playerId,
         myStack: round.players[playerId].stack,
         ledger,
+        chatMessages: [],
     };
 }
