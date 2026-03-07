@@ -7,7 +7,16 @@ import { getEngine } from "../games/core/registry";
 import { generatePlayerId } from "../utils/ids";
 import { GameType } from "../games/core/registry";
 
-export const httpServer = createServer();
+export const httpServer = createServer((req, res) => {
+    if (req.url === "/" || req.url === "/health") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok" }));
+        return;
+    }
+
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "not found" }));
+});
 const corsOrigin = (process.env.CORS_ORIGIN ?? "http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim())
