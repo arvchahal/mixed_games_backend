@@ -44,16 +44,13 @@ export class IndianPokerRules {
     }
 
     can_raise(player: IndianPokerPlayer, hand: HandState): boolean {
-        if (this.can_act(player, hand) && hand.currentBet > 0 && hand.currentBet < player.stack) {
-            return true;
-        }
-        return false;
+        if (!this.can_act(player, hand) || hand.currentBet === 0) return false;
+        const toMatch = hand.currentBet - player.currentBetAmount;
+        return toMatch < player.stack; // has chips left after matching
     }
     can_call(player: IndianPokerPlayer, hand: HandState): boolean {
-        if (this.can_act(player, hand) && hand.currentBet > 0 && hand.currentBet <= player.stack) {
-            return true;
-        }
-        return false;
+        if (!this.can_act(player, hand) || hand.currentBet === 0) return false;
+        return hand.currentBet > player.currentBetAmount; // something to call
     }
     can_check(player: IndianPokerPlayer, hand: HandState): boolean {
         return this.can_act(player, hand) && hand.currentBet === 0;
@@ -66,17 +63,13 @@ export class IndianPokerRules {
         hand: HandState,
         amount: number,
     ): boolean {
-        if (amount > player.stack || amount <= 0) {
-            return false;
-        }
-        if (amount == player.stack) {
-            return true;
-        }
-        let min_raise_size = hand.lastRaiseSize * 2;
-        if (player.stack < min_raise_size) {
-            return false;
-        }
-        return amount >= min_raise_size;
+        if (amount <= 0) return false;
+        const toMatch = hand.currentBet - player.currentBetAmount;
+        const totalToAdd = toMatch + amount;
+        if (totalToAdd > player.stack) return false;    // can't put in more than stack
+        if (totalToAdd >= player.stack) return true;   // all-in is always valid
+        const minRaiseSize = hand.lastRaiseSize * 2;
+        return amount >= minRaiseSize;
     }
 
     foldedAcePenalty(player: IndianPokerPlayer, hand: HandState): void {
@@ -85,8 +78,8 @@ export class IndianPokerRules {
             player.card &&
             player.card.rank == "A"
         ) {
-            player.stack /= 2;
-            hand.pot += player.stack;
+            player.stack = Math.round(player.stack / 2 * 100) / 100;
+            hand.pot = Math.round((hand.pot + player.stack) * 100) / 100;
         }
     }
 }

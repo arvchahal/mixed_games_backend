@@ -12,6 +12,8 @@ export type IndianPokerPlayer = {
   card: Card | null;
   handStatus: PlayerHandStatus;
   sessionStatus: PlayerSessionStatus;
+  seatIndex: number;
+  currentBetAmount: number;
 };
 
 export type HandState = {
@@ -19,6 +21,7 @@ export type HandState = {
   pot: number;
   currentBet: number;
   lastAggressorIndex: number | null;
+  streetOpenIndex: number; // index into playerOrder where action started this street
   currentPlayerIndex: number;
   playerOrder: string[];
   players: Record<string, IndianPokerPlayer>;
@@ -65,10 +68,19 @@ export type SelfPlayerView = Omit<IndianPokerPlayer, "card"> & {
   card: null;
 };
 
+export type LedgerEntry = {
+  displayName: string;
+  totalBuyIn: number;
+  stack: number;
+  delta: number;
+};
+
 export type IndianPokerPlayerView = {
   hand: Omit<HandState, "players"> & {
     players: Record<string, OtherPlayerView | SelfPlayerView>;
+    minRaise: number;
   };
   myId: string;
   myStack: number;
+  ledger: LedgerEntry[];
 };

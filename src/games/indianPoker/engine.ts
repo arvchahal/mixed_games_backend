@@ -12,6 +12,7 @@ import { isRoundOver } from "./helpers";
 import { IndianPokerDeck } from "./deck";
 
 const rules = new IndianPokerRules();
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export class IndianPokerEngine
     implements
@@ -79,7 +80,7 @@ export class IndianPokerEngine
         for (const player of seated) {
             const card = newRound.deck.pop()!;
             newRound.cardsRemaining--;
-            handPlayers[player.id] = { ...player, card, handStatus: "active" };
+            handPlayers[player.id] = { ...player, card, handStatus: "active", currentBetAmount: 0 };
         }
 
         // Post blinds (capped at stack for all-in situations)
@@ -89,7 +90,9 @@ export class IndianPokerEngine
         const bbAmount = Math.min(newRound.bigBlind, handPlayers[bbId].stack);
 
         handPlayers[sbId].stack -= sbAmount;
+        handPlayers[sbId].currentBetAmount = sbAmount;
         handPlayers[bbId].stack -= bbAmount;
+        handPlayers[bbId].currentBetAmount = bbAmount;
 
         if (handPlayers[sbId].stack === 0) handPlayers[sbId].handStatus = "all in";
         if (handPlayers[bbId].stack === 0) handPlayers[bbId].handStatus = "all in";
@@ -99,7 +102,8 @@ export class IndianPokerEngine
             pot: sbAmount + bbAmount,
             currentBet: bbAmount,
             lastRaiseSize: bbAmount,
-            lastAggressorIndex: bbIndex, // BB is last to act if no raise comes
+            lastAggressorIndex: null, // no aggressor yet; BB gets their option
+            streetOpenIndex: utgIndex, // action closes when we return here with no raise
             currentPlayerIndex: utgIndex,
             playerOrder,
             players: handPlayers,
@@ -129,41 +133,71 @@ export class IndianPokerEngine
                 break;
             }
             case "call": {
-                // call amount is capped at stack for all-in
-                const amount = Math.min(hand.currentBet, player.stack);
-                player.stack -= amount;
-                hand.pot += amount;
-                if (player.stack === 0) {
+                // only pay the difference between currentBet and what player already put in
+                const toCall = round2(Math.min(hand.currentBet - player.currentBetAmount, player.stack));
+                player.stack = round2(player.stack - toCall);
+                hand.pot = round2(hand.pot + toCall);
+                player.currentBetAmount = round2(player.currentBetAmount + toCall);
+                if (player.stack <= 0) {
+                    player.stack = 0;
                     player.handStatus = "all in";
                 }
                 break;
             }
             case "bet": {
-                player.stack -= action.amount;
-                hand.pot += action.amount;
-                hand.currentBet = action.amount;
-                hand.lastRaiseSize = action.amount;
+                const betAmt = round2(action.amount);
+                player.stack = round2(player.stack - betAmt);
+                hand.pot = round2(hand.pot + betAmt);
+                player.currentBetAmount = round2(player.currentBetAmount + betAmt);
+                hand.currentBet = betAmt;
+                hand.lastRaiseSize = betAmt;
                 hand.lastAggressorIndex = hand.currentPlayerIndex;
+                if (player.stack <= 0) { player.stack = 0; player.handStatus = "all in"; }
                 break;
             }
             case "raise": {
-                // amount is the raise increment, so total chips put in = currentBet + amount
-                const total = hand.currentBet + action.amount;
-                player.stack -= total;
-                hand.pot += total;
-                hand.currentBet += action.amount;
-                hand.lastRaiseSize = action.amount;
+                // amount is the raise increment above currentBet
+                // player only pays what they haven't yet contributed
+                const raiseAmt = round2(action.amount);
+                const toMatch = round2(hand.currentBet - player.currentBetAmount);
+                const toAdd = round2(toMatch + raiseAmt);
+                player.stack = round2(player.stack - toAdd);
+                hand.pot = round2(hand.pot + toAdd);
+                player.currentBetAmount = round2(player.currentBetAmount + toAdd);
+                hand.currentBet = round2(hand.currentBet + raiseAmt);
+                hand.lastRaiseSize = raiseAmt;
                 hand.lastAggressorIndex = hand.currentPlayerIndex;
+                if (player.stack <= 0) { player.stack = 0; player.handStatus = "all in"; }
                 break;
             }
         }
 
-        // Check if hand is over: only 1 (or 0) active players remain
+        // If everyone but one player has folded, the hand is immediately over.
+        const nonFoldedPlayers = hand.playerOrder.filter(
+            (id) => hand.players[id].handStatus !== "folded",
+        );
+        if (nonFoldedPlayers.length <= 1) {
+            hand.isOver = true;
+            return newRound;
+        }
+
         const activePlayers = hand.playerOrder.filter(
             (id) => hand.players[id].handStatus === "active",
         );
-        if (activePlayers.length <= 1) {
+        if (activePlayers.length === 0) {
             hand.isOver = true;
+            return newRound;
+        }
+
+        // One active player plus one or more all-in players is only over once
+        // the active player has matched the current bet.
+        if (activePlayers.length === 1) {
+            const loneActiveId = activePlayers[0];
+            const loneActive = hand.players[loneActiveId];
+            hand.currentPlayerIndex = hand.playerOrder.indexOf(loneActiveId);
+            if (round2(loneActive.currentBetAmount) === round2(hand.currentBet)) {
+                hand.isOver = true;
+            }
             return newRound;
         }
 
@@ -174,13 +208,17 @@ export class IndianPokerEngine
         }
         hand.currentPlayerIndex = next;
 
-        // Check if action has closed: returned to the last aggressor
-        // Note: the "everyone checks" case requires lastAggressorIndex to be
-        // initialized to the BB's index when the hand starts (handled in startHand)
-        if (
+        // Check if action has closed.
+        // Case 1: a raise happened — close when we return to the raiser.
+        // Case 2: no raise (everyone called/checked) — close when we return to
+        //         streetOpenIndex, meaning BB has had their option and checked.
+        const isBackToAggressor =
             hand.lastAggressorIndex !== null &&
-            hand.currentPlayerIndex === hand.lastAggressorIndex
-        ) {
+            hand.currentPlayerIndex === hand.lastAggressorIndex;
+        const isBackToStreetOpen =
+            hand.lastAggressorIndex === null &&
+            hand.currentPlayerIndex === hand.streetOpenIndex;
+        if (isBackToAggressor || isBackToStreetOpen) {
             hand.isOver = true;
         }
 
@@ -224,6 +262,8 @@ export class IndianPokerEngine
             card: null,
             handStatus: "active" as const,
             sessionStatus: "seated" as const,
+            seatIndex: p.seatIndex,
+            currentBetAmount: 0,
         }));
 
         return { players: builtPlayers, stake, smallBlind, bigBlind };
@@ -288,5 +328,11 @@ export class IndianPokerEngine
 
     isRoundOver(round: RoundState): boolean {
         return isRoundOver(round);
+    }
+
+    getCurrentPlayerId(round: RoundState): string | null {
+        const hand = round.currentHand;
+        if (!hand || hand.isOver) return null;
+        return hand.playerOrder[hand.currentPlayerIndex] ?? null;
     }
 }

@@ -3,6 +3,7 @@ import {
     OtherPlayerView,
     SelfPlayerView,
     RoundState,
+    LedgerEntry,
 } from "./types";
 
 export function getPlayerView(
@@ -18,7 +19,8 @@ export function getPlayerView(
         {};
     for (const [id, player] of Object.entries(hand.players)) {
         const { card, ...rest } = player;
-        if (id === playerId) {
+        const selfHasFolded = id === playerId && hand.players[id].handStatus === 'folded';
+        if (id === playerId && !hand.isOver && !selfHasFolded) {
             players_filtered[id] = {
                 ...rest,
                 card: null,
@@ -33,9 +35,17 @@ export function getPlayerView(
 
     const { players: _, ...handWithoutPlayers } = hand;
 
+    const ledger: LedgerEntry[] = Object.values(round.players).map((p) => ({
+        displayName: p.displayName,
+        totalBuyIn: p.totalBuyIn,
+        stack: p.stack,
+        delta: p.stack - p.totalBuyIn,
+    }));
+
     return {
-        hand: { ...handWithoutPlayers, players: players_filtered },
+        hand: { ...handWithoutPlayers, minRaise: hand.lastRaiseSize * 2, players: players_filtered },
         myId: playerId,
         myStack: round.players[playerId].stack,
+        ledger,
     };
 }

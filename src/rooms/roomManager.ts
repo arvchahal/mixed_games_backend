@@ -21,6 +21,9 @@ export function createRoom(
         displayName,
         joinedAt: Date.now(),
         stack,
+        sessionTotalBuyIn: 0,
+        sessionDelta: 0,
+        seatIndex: 0,
     };
 
     const room: Room = {

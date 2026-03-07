@@ -3,6 +3,7 @@ export type PlayerSeed = {
     displayName: string;
     isOwner: boolean;
     stack: number;
+    seatIndex: number;
 };
 
 export type PlayerSummary = {
@@ -25,4 +26,5 @@ export interface GameEngine<TState, TAction, TPlayerView, TRoundConfig> {
     getHandWinner(state: TState): string | null;
     getPlayerView(state: TState, playerId: string): TPlayerView;
     getRoundSummary(state: TState): PlayerSummary[];
+    getCurrentPlayerId(state: TState): string | null;
 }

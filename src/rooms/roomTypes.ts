@@ -7,6 +7,9 @@ export type RoomPlayer = {
     displayName: string;
     joinedAt: number; // Date.now() — used for ownership transfer order
     stack: number;
+    sessionTotalBuyIn: number;
+    sessionDelta: number;
+    seatIndex: number;
 };
 
 export type Room = {
