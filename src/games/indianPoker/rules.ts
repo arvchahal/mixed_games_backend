@@ -53,7 +53,8 @@ export class IndianPokerRules {
         return hand.currentBet > player.currentBetAmount; // something to call
     }
     can_check(player: IndianPokerPlayer, hand: HandState): boolean {
-        return this.can_act(player, hand) && hand.currentBet === 0;
+        // Player can check whenever they owe nothing: no bet, or already matched (BB option)
+        return this.can_act(player, hand) && player.currentBetAmount >= hand.currentBet;
     }
     isValidBetAmount(player: IndianPokerPlayer, amount: number): boolean {
         return amount > 0 && amount <= player.stack;
