@@ -12,6 +12,12 @@ export type RoomPlayer = {
     seatIndex: number;
 };
 
+export type RoomChatMessage = {
+    displayName: string;
+    text: string;
+    sentAt: number;
+};
+
 export type Room = {
     id: string;
     ownerId: string;
@@ -20,5 +26,6 @@ export type Room = {
     status: RoomStatus;
     players: RoomPlayer[];
     pendingPlayers: RoomPlayer[]; // joined mid-round, seated at next round start
+    chatMessages: RoomChatMessage[];
     round: unknown; // managed entirely through the engine, never accessed directly
 };

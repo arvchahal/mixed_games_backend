@@ -34,6 +34,7 @@ export function createRoom(
         status: "lobby",
         players: [owner],
         pendingPlayers: [],
+        chatMessages: [],
         round: null,
     };
 
