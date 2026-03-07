@@ -1,7 +1,7 @@
 import { Card } from "../core/types";
 
 export type PlayerHandStatus = "active" | "all in" | "folded";
-export type PlayerSessionStatus = "seated" | "pending" | "eliminated";
+export type PlayerSessionStatus = "seated" | "pending" | "eliminated" | "sitting_out";
 
 export type IndianPokerPlayer = {
   id: string;

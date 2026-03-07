@@ -44,12 +44,26 @@ function clearHandTransitionTimer(roomId: string) {
     }
 }
 
+// Mark round players who are disconnected as sitting_out so they skip the next deal.
+function sitOutDisconnectedPlayers(roomId: string) {
+    const room = getRoom(roomId);
+    if (!room?.round) return;
+    const roundPlayers = (room.round as { players?: Record<string, { sessionStatus: string }> }).players;
+    if (!roundPlayers) return;
+    for (const [pid, player] of Object.entries(roundPlayers)) {
+        if (player.sessionStatus === "seated" && !playerSockets.has(pid)) {
+            player.sessionStatus = "sitting_out";
+        }
+    }
+}
+
 function scheduleNextHand(roomId: string) {
     clearHandTransitionTimer(roomId);
     handTransitionTimers.set(
         roomId,
         setTimeout(() => {
             handTransitionTimers.delete(roomId);
+            sitOutDisconnectedPlayers(roomId);
             const result = startNextHand(roomId);
             if (!result.error) {
                 publishRoomState(roomId);
@@ -69,6 +83,9 @@ function scheduleTurnTimer(roomId: string) {
     const currentPlayerId = engine.getCurrentPlayerId(room.round);
     if (!currentPlayerId) return;
 
+    // Away players are folded immediately; connected players get the full timer.
+    const isAway = !playerSockets.has(currentPlayerId);
+
     turnTimers.set(
         roomId,
         setTimeout(() => {
@@ -83,7 +100,7 @@ function scheduleTurnTimer(roomId: string) {
             if (!result.error) {
                 publishRoomState(roomId);
             }
-        }, TURN_TIMEOUT_MS),
+        }, isAway ? 0 : TURN_TIMEOUT_MS),
     );
 }
 
@@ -95,6 +112,8 @@ export const io = new Server(httpServer, {
 
 // playerId → socketId so we can send each player their own view (hidden info)
 const playerSockets = new Map<string, string>();
+// playerId → roomId so disconnect can find the player's room instantly
+const playerRooms = new Map<string, string>();
 
 function broadcastLobby(roomId: string) {
     const room = getRoom(roomId);
@@ -104,7 +123,7 @@ function broadcastLobby(roomId: string) {
         ownerId: room.ownerId,
         status: room.status,
         settings: room.settings,
-        players: room.players,
+        players: room.players.map((p) => ({ ...p, connected: playerSockets.has(p.id) })),
         pendingPlayers: room.pendingPlayers,
         ledger: getRoomLedger(room),
     });
@@ -157,6 +176,7 @@ io.on("connection", (socket) => {
         const room = createRoom(playerId, displayName, gameType, settings, stack);
 
         playerSockets.set(playerId, socket.id);
+        playerRooms.set(playerId, room.id);
         socket.join(room.id);
         socket.emit("room_created", { roomId: room.id, playerId });
         broadcastLobby(room.id);
@@ -181,8 +201,25 @@ io.on("connection", (socket) => {
         }
 
         playerSockets.set(playerId, socket.id);
+        playerRooms.set(playerId, roomId);
         socket.join(roomId);
         socket.emit("room_joined", { roomId, playerId });
+
+        if (room.status === "in_round") {
+            // Restore sitting_out status if they reconnect between hands
+            const roundPlayers = (room.round as { players?: Record<string, { sessionStatus: string }> }).players;
+            const roundPlayer = roundPlayers?.[playerId];
+            if (roundPlayer?.sessionStatus === "sitting_out") {
+                roundPlayer.sessionStatus = "seated";
+            }
+
+            // Reconnecting mid-round: push their current game view immediately
+            // so they don't wait for the next action to see the table.
+            const views = getViews(room);
+            const playerView = views[playerId];
+            if (playerView) socket.emit("game_state", playerView);
+        }
+
         broadcastLobby(roomId);
     });
 
@@ -227,11 +264,34 @@ io.on("connection", (socket) => {
         broadcastLobby(roomId);
     });
 
+    socket.on("transfer_ownership", (data) => {
+        const roomId: string = data.room_id;
+        const playerId: string = data.player_id;
+        const targetId: string = data.target_id;
+
+        const room = getRoom(roomId);
+        if (!room) { socket.emit("error", { message: "room not found" }); return; }
+        if (room.ownerId !== playerId) { socket.emit("error", { message: "only the owner can transfer" }); return; }
+        if (!room.players.find((p) => p.id === targetId)) { socket.emit("error", { message: "player not found" }); return; }
+
+        room.ownerId = targetId;
+        broadcastLobby(roomId);
+    });
+
     socket.on("disconnect", () => {
+        let disconnectedPlayerId: string | null = null;
         for (const [playerId, socketId] of playerSockets.entries()) {
             if (socketId === socket.id) {
+                disconnectedPlayerId = playerId;
                 playerSockets.delete(playerId);
                 break;
+            }
+        }
+        if (disconnectedPlayerId) {
+            const roomId = playerRooms.get(disconnectedPlayerId);
+            if (roomId) {
+                const room = getRoom(roomId);
+                if (room) broadcastLobby(roomId);
             }
         }
     });
