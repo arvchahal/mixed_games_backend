@@ -54,6 +54,18 @@ export function updateRoomSettings(
     if (!room) return { error: "room not found" };
     if (room.ownerId !== playerId) return { error: "only the owner can change settings" };
     if (room.status !== "lobby") return { error: "cannot change settings while a round is in progress" };
+
+    const oldStake = Number(room.settings.stake) || 100;
     room.settings = { ...room.settings, ...settings };
+    const newStake = Number(room.settings.stake) || 100;
+
+    // Keep all player stacks in sync with the new stake so seat bubbles and
+    // the ledger stay accurate and startRound gives everyone the right chips.
+    if (newStake !== oldStake) {
+        for (const player of [...room.players, ...room.pendingPlayers]) {
+            player.stack = newStake;
+        }
+    }
+
     return {};
 }

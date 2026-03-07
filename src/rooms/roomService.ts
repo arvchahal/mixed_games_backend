@@ -190,10 +190,18 @@ export function getViews(room: Room): Record<string, unknown> {
 }
 
 export function getRoomLedger(room: Room): LedgerEntry[] {
-    const stake = Number(room.settings.stake) || 100;
+    // Use the stake the round was started with, not the current setting, so
+    // the delta doesn't shift if the owner edits settings between hands.
+    const settingsStake = Number(room.settings.stake) || 100;
+    const roundStake = room.status === "in_round" && room.round
+        ? (typeof (room.round as { stake?: number }).stake === "number"
+            ? (room.round as { stake: number }).stake
+            : settingsStake)
+        : settingsStake;
+
     return room.players.map((player) => {
         const stack = getDisplayedStack(room, player.id);
-        const inRoundDelta = room.status === "in_round" ? stack - stake : 0;
+        const inRoundDelta = room.status === "in_round" ? stack - roundStake : 0;
         const delta = player.sessionDelta + inRoundDelta;
         return {
             displayName: player.displayName,
