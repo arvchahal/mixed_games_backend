@@ -44,3 +44,16 @@ export function createRoom(
 export function getRoom(roomId: string): Room | null {
     return rooms.get(roomId) ?? null;
 }
+
+export function updateRoomSettings(
+    roomId: string,
+    playerId: string,
+    settings: Record<string, unknown>,
+): { error?: string } {
+    const room = rooms.get(roomId);
+    if (!room) return { error: "room not found" };
+    if (room.ownerId !== playerId) return { error: "only the owner can change settings" };
+    if (room.status !== "lobby") return { error: "cannot change settings while a round is in progress" };
+    room.settings = { ...room.settings, ...settings };
+    return {};
+}
