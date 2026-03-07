@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { Deck } from "../core/deck";
 import { Card, SUITS, RANKS } from "../core/types";
 export class IndianPokerDeck implements Deck {
@@ -23,11 +24,7 @@ export class IndianPokerDeck implements Deck {
         const result: Array<Card> = [...this.Cards];
 
         for (let i = result.length - 1; i > 0; i--) {
-            const randomBuffer = new Uint32Array(1);
-            crypto.getRandomValues(randomBuffer);
-
-            // Normalize to 0 - i
-            const j = randomBuffer[0] % (i + 1);
+            const j = randomInt(0, i + 1);
 
             // Swap elements
             [result[i], result[j]] = [result[j], result[i]];
