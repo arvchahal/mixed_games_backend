@@ -209,16 +209,33 @@ export class IndianPokerEngine
         hand.currentPlayerIndex = next;
 
         // Check if action has closed.
-        // Case 1: a raise happened — close when we return to the raiser.
+        // Case 1: a raise happened and aggressor is still active — close when we return to them.
         // Case 2: no raise (everyone called/checked) — close when we return to
         //         streetOpenIndex, meaning BB has had their option and checked.
+        // Case 3: aggressor went all-in — close once every active player has matched.
+        const aggressorPlayer =
+            hand.lastAggressorIndex !== null
+                ? hand.players[hand.playerOrder[hand.lastAggressorIndex]]
+                : null;
+        const aggressorIsActive = aggressorPlayer?.handStatus === "active";
+
         const isBackToAggressor =
             hand.lastAggressorIndex !== null &&
+            aggressorIsActive &&
             hand.currentPlayerIndex === hand.lastAggressorIndex;
         const isBackToStreetOpen =
             hand.lastAggressorIndex === null &&
             hand.currentPlayerIndex === hand.streetOpenIndex;
-        if (isBackToAggressor || isBackToStreetOpen) {
+        const allInAggressorSettled =
+            hand.lastAggressorIndex !== null &&
+            !aggressorIsActive &&
+            activePlayers.every(
+                (id) =>
+                    round2(hand.players[id].currentBetAmount) >=
+                    round2(hand.currentBet),
+            );
+
+        if (isBackToAggressor || isBackToStreetOpen || allInAggressorSettled) {
             hand.isOver = true;
         }
 
