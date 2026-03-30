@@ -135,7 +135,8 @@ function broadcastLobby(roomId: string) {
         status: room.status,
         settings: room.settings,
         players: room.players.map((p) => ({ ...p, connected: playerSockets.has(p.id) })),
-        pendingPlayers: room.pendingPlayers,
+        pendingPlayers: room.pendingPlayers.filter((p) => !p.isSpectator),
+        spectators: room.pendingPlayers.filter((p) => p.isSpectator).map((p) => ({ ...p, connected: playerSockets.has(p.id) })),
         ledger: getRoomLedger(room),
         chatMessages: room.chatMessages,
     });
@@ -198,15 +199,16 @@ io.on("connection", (socket) => {
         const roomId: string = data.room_id;
         const displayName: string = data.display_name;
         const playerId: string = data.player_id ?? generatePlayerId();
+        const isSpectator: boolean = data.spectator ?? false;
 
         const room = getRoom(roomId);
         if (!room) {
             socket.emit("error", { message: "room not found" });
             return;
         }
-        const stack: number = (room.settings.stake as number) ?? 100;
+        const stack: number = isSpectator ? 0 : ((room.settings.stake as number) ?? 100);
 
-        const result = joinRoom(roomId, playerId, displayName, stack);
+        const result = joinRoom(roomId, playerId, displayName, stack, isSpectator);
         if (result.error) {
             socket.emit("error", { message: result.error });
             return;

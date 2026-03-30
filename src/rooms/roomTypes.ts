@@ -10,6 +10,7 @@ export type RoomPlayer = {
     sessionTotalBuyIn: number;
     sessionDelta: number;
     seatIndex: number;
+    isSpectator?: boolean;
 };
 
 export type RoomChatMessage = {

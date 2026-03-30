@@ -82,6 +82,7 @@ export type IndianPokerPlayerView = {
   };
   myId: string;
   myStack: number;
+  handsRemaining: number;
   ledger: LedgerEntry[];
   chatMessages: {
     displayName: string;

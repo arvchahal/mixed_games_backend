@@ -21,6 +21,7 @@ export function joinRoom(
     playerId: string,
     displayName: string,
     stack: number,
+    isSpectator = false,
 ): ServiceResult {
     const room = getRoom(roomId);
     if (!room) return { error: "room not found" };
@@ -45,12 +46,14 @@ export function joinRoom(
         sessionTotalBuyIn: 0,
         sessionDelta: 0,
         seatIndex,
+        isSpectator,
     };
 
-    if (room.status === "lobby") {
-        room.players.push(player);
-    } else {
+    // Spectators always stay in pendingPlayers — they never get seated
+    if (isSpectator || room.status !== "lobby") {
         room.pendingPlayers.push(player);
+    } else {
+        room.players.push(player);
     }
 
     return {};
@@ -85,9 +88,9 @@ export function startRound(roomId: string, requesterId: string): ServiceResult {
         return { error: "round already in progress" };
     if (room.players.length < 2) return { error: "need at least 2 players" };
 
-    // Seat pending players
-    room.players.push(...room.pendingPlayers);
-    room.pendingPlayers = [];
+    // Seat pending players (spectators stay in pendingPlayers indefinitely)
+    room.players.push(...room.pendingPlayers.filter((p) => !p.isSpectator));
+    room.pendingPlayers = room.pendingPlayers.filter((p) => p.isSpectator);
 
     const roundStake = Number(room.settings.stake) || 100;
     for (const player of room.players) {
@@ -175,7 +178,8 @@ export function getViews(room: Room): Record<string, unknown> {
     if (!room.round) return {};
     const engine = getEngine(room.gameType);
     const views: Record<string, unknown> = {};
-    for (const player of room.players) {
+    const spectators = room.pendingPlayers.filter((p) => p.isSpectator);
+    for (const player of [...room.players, ...spectators]) {
         try {
             const view = engine.getPlayerView(room.round, player.id) as PlayerViewPayload & Record<string, unknown>;
             views[player.id] = {
