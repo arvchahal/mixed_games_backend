@@ -294,11 +294,41 @@ export class IndianPokerEngine
         const newRound = structuredClone(round);
         const hand = newRound.currentHand!;
 
-        const winnerId = this.getHandWinner(newRound);
-        if (winnerId) {
-            hand.players[winnerId].stack += hand.pot;
-            hand.winnerId = winnerId;
+        const allPlayers = hand.playerOrder.map((id) => hand.players[id]);
+
+        // Build side pots by contribution level.
+        // At each level, every player who put in >= that amount contributes (level - prevLevel)
+        // chips to the sub-pot, and only non-folded players at that level can win it.
+        const betLevels = [...new Set(allPlayers.map((p) => p.currentBetAmount))]
+            .filter((b) => b > 0)
+            .sort((a, b) => a - b);
+
+        let prevLevel = 0;
+        const sidePots: Array<{ amount: number; eligibleIds: string[] }> = [];
+
+        for (const level of betLevels) {
+            const levelDiff = round2(level - prevLevel);
+            const contributors = allPlayers.filter((p) => p.currentBetAmount >= level);
+            const potAmount = round2(levelDiff * contributors.length);
+            const eligibleIds = contributors
+                .filter((p) => p.handStatus !== "folded")
+                .map((p) => p.id);
+            sidePots.push({ amount: potAmount, eligibleIds });
+            prevLevel = level;
         }
+
+        // Distribute each sub-pot to its winner (best card among eligible players)
+        let mainWinnerId: string | null = null;
+        for (const sidePot of sidePots) {
+            const eligiblePlayers = sidePot.eligibleIds.map((id) => hand.players[id]);
+            const potWinner = rules.determine_winner(eligiblePlayers);
+            if (potWinner) {
+                hand.players[potWinner.id].stack = round2(hand.players[potWinner.id].stack + sidePot.amount);
+                if (!mainWinnerId) mainWinnerId = potWinner.id;
+            }
+        }
+
+        hand.winnerId = mainWinnerId;
 
         // Sync hand stacks back to round players
         for (const [id, handPlayer] of Object.entries(hand.players)) {
@@ -306,8 +336,8 @@ export class IndianPokerEngine
         }
 
         // Record hand result
-        if (winnerId) {
-            newRound.handHistory.push({ winnerId, pot: hand.pot });
+        if (mainWinnerId) {
+            newRound.handHistory.push({ winnerId: mainWinnerId, pot: hand.pot });
         }
 
         // Eliminate busted players

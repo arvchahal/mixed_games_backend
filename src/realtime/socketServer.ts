@@ -17,10 +17,21 @@ export const httpServer = createServer((req, res) => {
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "not found" }));
 });
-const corsOrigin = (process.env.CORS_ORIGIN ?? "http://localhost:3000")
+const corsAllowlist = (process.env.CORS_ORIGIN ?? "http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+function corsOrigin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    if (!origin) return callback(null, true); // same-origin / non-browser requests
+    const allowed = corsAllowlist.some((o) =>
+        o === origin || (o.startsWith("*.") && origin.endsWith(o.slice(1)))
+    );
+    if (allowed) return callback(null, true);
+    // Also allow any *.vercel.app preview for this project
+    if (/^https:\/\/mixed-games-frontend[^.]*\.vercel\.app$/.test(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+}
 
 // roomId → active turn timeout
 const turnTimers = new Map<string, ReturnType<typeof setTimeout>>();
