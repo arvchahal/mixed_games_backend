@@ -135,6 +135,12 @@ export function handlePlayerAction(
     if (engine.isHandOver(room.round)) {
         room.round = engine.resolveHand(room.round);
 
+        const msg = buildHandMessage(room.round);
+        if (msg) {
+            room.chatMessages.push({ displayName: "Game", text: msg, sentAt: Date.now() });
+            room.chatMessages = room.chatMessages.slice(-100);
+        }
+
         if (engine.isRoundOver(room.round)) {
             endRound(room);
         }
@@ -234,4 +240,62 @@ function getDisplayedStack(room: Room, playerId: string): number {
     }
 
     return room.players.find((player) => player.id === playerId)?.stack ?? 0;
+}
+
+type HandPlayer = {
+    displayName: string;
+    handStatus: string;
+    card: { rank: string; suit: string } | null;
+};
+
+function buildHandMessage(round: unknown): string | null {
+    const hand = (round as {
+        currentHand?: {
+            winnerId: string | null;
+            pot: number;
+            playerOrder: string[];
+            players: Record<string, HandPlayer>;
+        };
+    }).currentHand;
+
+    if (!hand?.winnerId) return null;
+
+    const winner = hand.players[hand.winnerId];
+    const others = hand.playerOrder.filter((id) => id !== hand.winnerId);
+    const folded = others.filter((id) => hand.players[id].handStatus === "folded");
+    const showed = others.filter((id) => hand.players[id].handStatus !== "folded");
+
+    // Ace fold penalty notice
+    const acePenalties = folded
+        .filter((id) => hand.players[id].card?.rank === "A")
+        .map((id) => `${hand.players[id].displayName} folded an Ace (penalty)`);
+
+    let reason: string;
+
+    if (showed.length === 0) {
+        // Everyone else folded
+        if (folded.length === 1) {
+            reason = `${hand.players[folded[0]].displayName} folded`;
+        } else {
+            reason = "everyone folded";
+        }
+    } else {
+        // Showdown — describe winner's card vs best runner-up
+        const winnerCard = winner.card?.rank ?? "?";
+        if (showed.length === 1) {
+            const runnerUp = hand.players[showed[0]];
+            const runnerCard = runnerUp.card?.rank ?? "?";
+            reason = `${winnerCard} beats ${runnerUp.displayName}'s ${runnerCard}`;
+        } else {
+            const runners = showed.map((id) => `${hand.players[id].displayName} (${hand.players[id].card?.rank ?? "?"})`).join(", ");
+            reason = `${winnerCard} beats ${runners}`;
+        }
+        if (folded.length > 0) {
+            const foldedNames = folded.map((id) => hand.players[id].displayName).join(", ");
+            reason += `; ${foldedNames} folded`;
+        }
+    }
+
+    const parts = [`${winner.displayName} wins ${hand.pot} — ${reason}`, ...acePenalties];
+    return parts.join(". ");
 }

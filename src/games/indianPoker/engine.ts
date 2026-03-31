@@ -319,13 +319,23 @@ export class IndianPokerEngine
 
         // Distribute each sub-pot to its winner (best card among eligible players)
         let mainWinnerId: string | null = null;
+        let totalDistributed = 0;
         for (const sidePot of sidePots) {
             const eligiblePlayers = sidePot.eligibleIds.map((id) => hand.players[id]);
             const potWinner = rules.determine_winner(eligiblePlayers);
             if (potWinner) {
                 hand.players[potWinner.id].stack = round2(hand.players[potWinner.id].stack + sidePot.amount);
+                totalDistributed = round2(totalDistributed + sidePot.amount);
                 if (!mainWinnerId) mainWinnerId = potWinner.id;
             }
+        }
+
+        // Ace fold penalties are added directly to hand.pot without going through
+        // currentBetAmount, so they won't appear in any side pot. Give the remainder
+        // to the main pot winner.
+        const remainder = round2(hand.pot - totalDistributed);
+        if (remainder > 0 && mainWinnerId) {
+            hand.players[mainWinnerId].stack = round2(hand.players[mainWinnerId].stack + remainder);
         }
 
         hand.winnerId = mainWinnerId;
