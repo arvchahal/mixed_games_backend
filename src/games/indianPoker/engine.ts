@@ -223,9 +223,22 @@ export class IndianPokerEngine
             hand.lastAggressorIndex !== null &&
             aggressorIsActive &&
             hand.currentPlayerIndex === hand.lastAggressorIndex;
+        // If the original street opener folded, find the next non-folded player
+        // from that position forward — they become the effective closer.
+        // Only close when that player has already matched (they've explicitly acted,
+        // not just posted a blind) to ensure everyone gets their option.
+        let effectiveStreetOpen = hand.streetOpenIndex;
+        for (let i = 0; i < hand.playerOrder.length; i++) {
+            const idx = (hand.streetOpenIndex + i) % hand.playerOrder.length;
+            if (hand.players[hand.playerOrder[idx]]?.handStatus !== "folded") {
+                effectiveStreetOpen = idx;
+                break;
+            }
+        }
         const isBackToStreetOpen =
             hand.lastAggressorIndex === null &&
-            hand.currentPlayerIndex === hand.streetOpenIndex;
+            hand.currentPlayerIndex === effectiveStreetOpen &&
+            round2(hand.players[hand.playerOrder[effectiveStreetOpen]].currentBetAmount) >= round2(hand.currentBet);
         const allInAggressorSettled =
             hand.lastAggressorIndex !== null &&
             !aggressorIsActive &&
