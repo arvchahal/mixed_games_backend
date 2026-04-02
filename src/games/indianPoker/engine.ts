@@ -383,7 +383,6 @@ export class IndianPokerEngine
         }));
     }
 
-    getPlayerView(round: RoundState, playerId: string): IndianPokerPlayerView {
         return getPlayerView(round, playerId, options);
     }
 

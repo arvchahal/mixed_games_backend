@@ -187,7 +187,6 @@ export function getViews(room: Room): Record<string, unknown> {
     const spectators = room.pendingPlayers.filter((p) => p.isSpectator);
     for (const player of [...room.players, ...spectators]) {
         try {
-            const view = engine.getPlayerView(room.round, player.id) as PlayerViewPayload & Record<string, unknown>;
             views[player.id] = {
                 ...view,
                 myStack: getDisplayedStack(room, player.id),
