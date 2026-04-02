@@ -384,7 +384,7 @@ export class IndianPokerEngine
     }
 
     getPlayerView(round: RoundState, playerId: string): IndianPokerPlayerView {
-        return getPlayerView(round, playerId);
+        return getPlayerView(round, playerId, options);
     }
 
     getHandWinner(round: RoundState): string | null {
