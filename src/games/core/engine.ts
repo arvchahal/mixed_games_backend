@@ -24,6 +24,7 @@ export interface GameEngine<TState, TAction, TPlayerView, TRoundConfig> {
     isHandOver(state: TState): boolean;
     isRoundOver(state: TState): boolean;
     getHandWinner(state: TState): string | null;
+    getPlayerView(state: TState, playerId: string): TPlayerView;
     getRoundSummary(state: TState): PlayerSummary[];
     getCurrentPlayerId(state: TState): string | null;
 }

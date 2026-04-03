@@ -208,6 +208,7 @@ io.on("connection", (socket) => {
         }
         const stack: number = isSpectator ? 0 : ((room.settings.stake as number) ?? 100);
 
+        const result = joinRoom(roomId, playerId, displayName, stack, isSpectator);
         if (result.error) {
             socket.emit("error", { message: result.error });
             return;
