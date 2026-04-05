@@ -383,7 +383,8 @@ export class IndianPokerEngine
         }));
     }
 
-        return getPlayerView(round, playerId, options);
+    getPlayerView(round: RoundState, playerId: string): IndianPokerPlayerView {
+        return getPlayerView(round, playerId);
     }
 
     getHandWinner(round: RoundState): string | null {

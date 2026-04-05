@@ -42,10 +42,15 @@ export function getPlayerView(
         delta: p.stack - p.totalBuyIn,
     }));
 
+    const numPlayers = Object.keys(hand.players).length;
+    const handsRemaining = numPlayers > 0 ? Math.floor(round.cardsRemaining / numPlayers) : 0;
+
     return {
         hand: { ...handWithoutPlayers, minRaise: hand.lastRaiseSize * 2, players: players_filtered },
         myId: playerId,
         myStack: round.players[playerId].stack,
+        handsRemaining,
         ledger,
+        chatMessages: [],
     };
 }
